@@ -11,7 +11,7 @@ from statsmodels.tsa.vector_ar.vecm import coint_johansen
 from utils.session import fetch_session
 
 fetch_session()
-if 'authenticated' not in st.session_state:
+if not st.session_state.get('authenticated'):
     st.write("Please login first")
     st.link_button("Login", "https://localhost:5000")
     st.stop()
@@ -68,8 +68,28 @@ def get_hedge_ratio(close_price):
         hedge_ratio.iloc[i] = jres.evec.T[0]
     return hedge_ratio
 
+# Interactive Brokers position's API
+
+
+def get_current_positions():
+    page_id = 0
+    response = requests.get(
+        f"https://localhost:5000/v1/api/portfolio/{st.session_state['selected_account']}/positions/{page_id}", timeout=60,
+        verify=False)
+    response_body = response.json()
+    current_positions = []
+    for item in response_body:
+        symbol = item['contractDesc']
+        current_positions.append({
+            'symbol': symbol,
+            'position': item['position']
+        })
+
+    return current_positions
 
 # Interactive Brokers place order's API
+
+
 def place_orders(orders: pd.DataFrame):
     # TODO: handle here
     if len(orders) == 0:
@@ -143,8 +163,12 @@ zscore_spread = (spread - spread.rolling(LOOK_BACK).mean()) / \
     spread.rolling(LOOK_BACK).std()
 
 # Current position
+raw_positions = get_current_positions()
+position_map = {}
+for item in raw_positions:
+    position_map[item['symbol']] = item['position']
 current_positions = pd.DataFrame(
-    [-63.5, 115], index=hedge_ratio.columns, columns=['position'])
+    position_map.values(), index=list(position_map.keys()), columns=['position'])
 
 # Signal
 long_entry_signal = zscore_spread < -ENTRY_ZSCORE
@@ -163,8 +187,6 @@ current_positions
 
 st.header("Next positions")
 next_positions = current_positions
-last_exit_signal = 0
-last_entry_signal = -2
 if last_exit_signal:
     st.checkbox('Exit signal', value=True, disabled=True)
     next_positions = pd.DataFrame(
@@ -174,7 +196,8 @@ if last_entry_signal:
     next_positions = pd.DataFrame(
         (hedge_ratio*last_entry_signal).iloc[-1].values, index=hedge_ratio.columns, columns=['position'])
 
-rebalance_positions = current_positions - next_positions
+st.write(next_positions)
+rebalance_positions = (next_positions - current_positions).dropna()
 if (rebalance_positions['position'] != 0).any():
     st.subheader("Rebalance positions")
     st.write(rebalance_positions)
