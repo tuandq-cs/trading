@@ -1,23 +1,29 @@
 import streamlit as st
-import requests
+from brokers.interactive_broker import ERR_UNAUTHENTICATED_CLIENT_PORTAL_GATEWAY, InteractiveBrokers
+from constants.url import INTERACTIVE_BROKER_BASE_URL
+from portfolio.service import PortfolioService
+
+
+@st.cache_resource
+def __init_broker() -> InteractiveBrokers:
+    return InteractiveBrokers(base_url=INTERACTIVE_BROKER_BASE_URL)
+
+
+@st.cache_resource
+def __init_portfolio_service(broker: InteractiveBrokers) -> PortfolioService:
+    return PortfolioService(interactive_broker=broker)
 
 
 def fetch_session():
-    st.session_state['authenticated'] = False
+    broker = __init_broker()
+    portfolio_service = __init_portfolio_service(broker=broker)
     try:
-        # TODO:  handle more for not establish localhost 5000
-        response = requests.post(
-            'https://localhost:5000/v1/api/iserver/auth/status', timeout=60, verify=False)
-        if response.status_code != 200:
-            return
-        response_body = response.json()
-        if not response_body.get('authenticated'):
-            return
-        st.session_state['authenticated'] = True
-        if 'selected_account' not in st.session_state:
-            response = requests.get(
-                'https://localhost:5000/v1/api/iserver/accounts', timeout=60, verify=False)
-            response_body = response.json()
-            st.session_state['selected_account'] = response_body['selectedAccount']
-    except Exception as err:
-        st.toast(err)
+        broker.auth()
+    except ValueError as err:
+        st.toast(f"Got error: {err}")
+        if err is ERR_UNAUTHENTICATED_CLIENT_PORTAL_GATEWAY:
+            st.write("Please login first")
+            st.link_button("Login", INTERACTIVE_BROKER_BASE_URL)
+        st.stop()
+    st.session_state.broker = broker
+    st.session_state.portfolio_service = portfolio_service

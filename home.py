@@ -1,11 +1,6 @@
 import streamlit as st
-import requests
+from app import init_app
 
-from utils.session import fetch_session
-
-fetch_session()
-if not st.session_state.get('authenticated'):
-    st.write("Please login first")
-    st.link_button("Login", "https://localhost:5000")
-    st.stop()
-st.write(f"Welcome {st.session_state['selected_account']}")
+app = init_app()
+app.fetch_session()
+st.write(f"Welcome {app.broker.get_selected_account()}")

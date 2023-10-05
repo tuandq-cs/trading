@@ -11,10 +11,6 @@ from statsmodels.tsa.vector_ar.vecm import coint_johansen
 from utils.session import fetch_session
 
 fetch_session()
-if not st.session_state.get('authenticated'):
-    st.write("Please login first")
-    st.link_button("Login", "https://localhost:5000")
-    st.stop()
 
 START_HISTORICAL_DATE = datetime.datetime(2015, 1, 1)
 LOOK_BACK = 46
