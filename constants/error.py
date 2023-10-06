@@ -1,0 +1,2 @@
+ERR_DATA_NOT_IN_DISK = ValueError(
+    'ERR_DATA_NOT_IN_DISK')

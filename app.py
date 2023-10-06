@@ -2,17 +2,24 @@ import streamlit as st
 
 from brokers.interactive_broker import ERR_UNAUTHENTICATED_CLIENT_PORTAL_GATEWAY, InteractiveBrokers
 from constants.url import INTERACTIVE_BROKER_BASE_URL
+from data_provider.wrapper import DataProviderWrapper
 from portfolio.service import PortfolioService
+from strategies.mean_reversion import MeanReversionStrategy
 
 
 class App():
     broker: InteractiveBrokers
     portfolio_service: PortfolioService
+    data_provider: DataProviderWrapper
+    mean_reversion_strategy: MeanReversionStrategy
 
     def __init__(self) -> None:
         self.broker = InteractiveBrokers(base_url=INTERACTIVE_BROKER_BASE_URL)
         self.portfolio_service = PortfolioService(
             interactive_broker=self.broker)
+        self.data_provider = DataProviderWrapper()
+        self.mean_reversion_strategy = MeanReversionStrategy(
+            data_provider=self.data_provider)
 
     def fetch_session(self):
         try:
