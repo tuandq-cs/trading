@@ -62,4 +62,4 @@ class MeanReversionStrategy:
         short_num_units = short_num_units.fillna(method='ffill')
 
         num_units = long_num_units + short_num_units
-        return hedge_ratio.mul(num_units, axis=0)
+        return zscore_spread, hedge_ratio.mul(num_units, axis=0)

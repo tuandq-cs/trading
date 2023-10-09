@@ -1,4 +1,5 @@
 import requests
+from model.instrument import Instrument
 from portfolio.model import Portfolio, PositionDetail
 
 ERR_UNAUTHENTICATED_CLIENT_PORTAL_GATEWAY = ValueError(
@@ -45,6 +46,7 @@ class InteractiveBrokers:
             raise ERR_UNAUTHENTICATED_CLIENT_PORTAL_GATEWAY
         current_positions: list[PositionDetail] = []
         for item in response.json():
+            # TODO: handle instrument_type
             current_positions.append(PositionDetail(
-                broker=self.__name, instrument=item['contractDesc'], broker_instrument_id=item['conid'], position=item['position']))
+                broker=self.__name, instrument=Instrument(symbol=item['contractDesc'], instrument_type='etf'), broker_instrument_id=item['conid'], position=item['position']))
         return Portfolio(positions=current_positions)
