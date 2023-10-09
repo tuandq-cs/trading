@@ -3,9 +3,10 @@ import numpy as np
 
 import pandas as pd
 from constants.common import START_HISTORICAL_DATE
-from data_provider.wrapper import DataProviderWrapper
-from model.instrument import Instrument
+
 from statsmodels.tsa.vector_ar.vecm import coint_johansen
+from pkg.data_provider.wrapper import DataProviderWrapper
+from pkg.instrument.model import Instrument
 
 
 class MeanReversionStrategy:

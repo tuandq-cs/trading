@@ -3,9 +3,9 @@ import datetime
 
 import pandas as pd
 from constants.error import ERR_DATA_NOT_IN_DISK
-from data_provider.disk import Disk
-from data_provider.twelvedata import TwelveData
-from model.instrument import Instrument
+from pkg.data_provider.disk import Disk
+from pkg.data_provider.twelvedata import TwelveData
+from pkg.instrument.model import Instrument
 
 
 class DataProviderWrapper():

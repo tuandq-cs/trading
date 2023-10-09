@@ -1,6 +1,6 @@
 
-from brokers.interactive_broker import InteractiveBrokers
-from portfolio.model import Portfolio
+from pkg.brokers.interactive_broker import InteractiveBrokers
+from pkg.portfolio.model import Portfolio
 
 
 class PortfolioService:

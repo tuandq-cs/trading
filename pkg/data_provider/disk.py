@@ -6,7 +6,7 @@ import os
 import pandas as pd
 
 from constants.error import ERR_DATA_NOT_IN_DISK
-from model.instrument import Instrument
+from pkg.instrument.model import Instrument
 
 
 class Disk:

@@ -5,7 +5,7 @@ import io
 import pandas as pd
 import requests
 
-from model.instrument import Instrument
+from pkg.instrument.model import Instrument
 
 
 class TwelveData():

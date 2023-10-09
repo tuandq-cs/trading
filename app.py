@@ -1,10 +1,10 @@
 import streamlit as st
 
-from brokers.interactive_broker import ERR_UNAUTHENTICATED_CLIENT_PORTAL_GATEWAY, InteractiveBrokers
 from constants.url import INTERACTIVE_BROKER_BASE_URL
-from data_provider.wrapper import DataProviderWrapper
-from portfolio.service import PortfolioService
-from strategies.mean_reversion import MeanReversionStrategy
+from pkg.brokers.interactive_broker import ERR_UNAUTHENTICATED_CLIENT_PORTAL_GATEWAY, InteractiveBrokers
+from pkg.data_provider.wrapper import DataProviderWrapper
+from pkg.portfolio.service import PortfolioService
+from pkg.strategies.mean_reversion import MeanReversionStrategy
 
 
 class App():

@@ -3,8 +3,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 from app import init_app
-from constants.common import START_HISTORICAL_DATE
-from model.instrument import Instrument
+from pkg.instrument.model import Instrument
 
 
 app = init_app()

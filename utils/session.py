@@ -1,7 +1,7 @@
 import streamlit as st
-from brokers.interactive_broker import ERR_UNAUTHENTICATED_CLIENT_PORTAL_GATEWAY, InteractiveBrokers
 from constants.url import INTERACTIVE_BROKER_BASE_URL
-from portfolio.service import PortfolioService
+from pkg.brokers.interactive_broker import ERR_UNAUTHENTICATED_CLIENT_PORTAL_GATEWAY, InteractiveBrokers
+from pkg.portfolio.service import PortfolioService
 
 
 @st.cache_resource

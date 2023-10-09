@@ -1,6 +1,7 @@
 import requests
-from model.instrument import Instrument
-from portfolio.model import Portfolio, PositionDetail
+from pkg.instrument.model import Instrument
+
+from pkg.portfolio.model import Portfolio, PositionDetail
 
 ERR_UNAUTHENTICATED_CLIENT_PORTAL_GATEWAY = ValueError(
     'ERR_UNAUTHENTICATED_CLIENT_PORTAL_GATEWAY')
