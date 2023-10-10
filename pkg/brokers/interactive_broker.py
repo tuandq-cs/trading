@@ -117,7 +117,8 @@ class InteractiveBrokers:
                 request_payload = {
                     'orders': [
                         {
-                            'conid': order.instrument.broker_instrument_id,
+                            'conid': int(order.instrument.broker_instrument_id),
+                            'cOID': order.request_order_id,
                             'orderType': 'MKT',  # TODO: handle orderType here
                             'side': 'BUY' if order.side == OrderSide.BUY else 'SELL',
                             'quantity': order.quantity,
@@ -125,25 +126,24 @@ class InteractiveBrokers:
                         }
                     ]
                 }
-                is_success = True
-                if not is_success:
-                    continue
-                broker_order_id = '123'
-                order.broker_order_id = broker_order_id
-                order.status = 'REQUEST_SUCCESS'
+                order.status = 'SENDING_REQUEST'
                 order.request_payload = json.dumps(request_payload)
                 order.created_at = now
-                # response = requests.post(
-                #     f'{self.__base_url}/v1/api/iserver/account/{self.get_selected_account()}/orders', timeout=self.__timeout_second, verify=False,
-                #     json={
-                #         'orders': [],
-                #     }
-                # )
-                # response_body = response.json()
-                # if response.status_code != 200:
-                #     raise ValueError(
-                #         f"Status code: {response.status_code}, Message: {response_body}")
-                # print(response_body)
+                response = requests.post(
+                    f'{self.__base_url}/v1/api/iserver/account/{self.get_selected_account()}/orders', timeout=self.__timeout_second, verify=False,
+                    json=request_payload
+                )
+                order.response_payload = response.text
+                response_body = response.json()
+                if response.status_code != 200:
+                    order.status = 'SENT_REQUEST_FAILED'
+                    raise ValueError(
+                        f"Status code: {response.status_code}, Message: {response_body}")
+                if not isinstance(response_body, list) and len(response_body) == 0:
+                    order.status = 'FAILED_TO_PARSE_RESPONSE_BODY'
+                    raise ValueError("INVALID_RESPONSE_BODY")
+                order.status = 'SENT_REQUEST_SUCCESSFUL'
+                order.broker_order_id = response_body[0].get('order_id')
             except requests.exceptions.RequestException as err:
                 raise ERR_UNAUTHENTICATED_CLIENT_PORTAL_GATEWAY from err
         return orders

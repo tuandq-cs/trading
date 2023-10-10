@@ -65,11 +65,14 @@ class App():
             instrument = instrument_map.get(instrument_key)
             if not instrument:
                 raise err_not_support_instrument(instrument_key)
-            qty = round(orders_series.loc[instrument_key], 6)
+            qty = round(orders_series.loc[instrument_key], 4)
             side = OrderSide.BUY if qty >= 0 else OrderSide.SELL
             orders.append(Order(instrument=instrument, quantity=abs(qty),
                           side=side))
         self.order_service.place_orders(orders=orders)
+
+    def get_orders_history(self) -> pd.DataFrame:
+        return self.order_service.get_orders_history_df()
 
 
 @st.cache_resource

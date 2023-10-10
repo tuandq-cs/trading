@@ -25,6 +25,7 @@ class Order:
     request_order_id: str
     status: str  # TODO: consider enums here
     request_payload: str
+    response_payload: str
     created_at: datetime.datetime
 
     def __init__(self, instrument: Instrument, quantity: int, side: OrderSide) -> None:
@@ -43,5 +44,6 @@ class Order:
             'side': self.side.name,
             'quantity': self.quantity,
             'created_at': self.created_at.timestamp(),
-            'request_payload': self.request_payload
+            'request_payload': self.request_payload,
+            'response_payload': self.response_payload
         }
