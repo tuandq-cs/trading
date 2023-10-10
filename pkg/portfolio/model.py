@@ -8,9 +8,7 @@ from pkg.instrument.model import Instrument
 
 @dataclass
 class PositionDetail:
-    broker: str
     instrument: Instrument
-    broker_instrument_id: str
     position: int
 
 
@@ -25,5 +23,4 @@ class Portfolio:
             {
                 'instrument': str(position.instrument),
                 'position': position.position,
-                'broker_instrument_id': position.broker_instrument_id,
             } for position in self.__positions])

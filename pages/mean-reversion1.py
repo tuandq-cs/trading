@@ -10,26 +10,24 @@ app = init_app()
 app.fetch_session()
 st.title("Mean reversion")
 
-current_portfolio = app.portfolio_service.get_current_portfolio()
+current_portfolio = app.get_current_portfolio()
 positions_df = current_portfolio.get_positions_df().set_index('instrument')
 st.header("Current positions")
 st.table(positions_df)
 
 
-def supported_instruments() -> List[Instrument]:
-    return [
-        Instrument('IYE', 'etf'),
-        Instrument('VDE', 'etf')
-    ]
-
-
 def place_orders_callback():
     # TODO: implement here
+    try:
+        app.place_orders(rebalance_orders)
+    except ValueError as err:
+        st.toast(f"Got error: {err}")
     st.balloons()
 
 
+instrument_map = app.get_instrument_map()
 st.header("Choose instruments")
-chosen_instruments = st.multiselect("Instruments", supported_instruments())
+chosen_instruments = st.multiselect("Instruments", instrument_map.values())
 
 if len(chosen_instruments) >= 2:
     zscore_spread, generated_positions = app.mean_reversion_strategy.generate_trading_signal(
@@ -38,20 +36,16 @@ if len(chosen_instruments) >= 2:
     st.subheader("Next positions")
     st.table(next_positions)
 
-    current_positions = positions_df['position']
-    rebalance_positions = pd.Series(np.NaN, index=next_positions.index)
-    rebalance_positions = next_positions.subtract(
-        current_positions, fill_value=0)
-    rebalance_positions = rebalance_positions.loc[next_positions.index]
-    rebalance_positions = rebalance_positions[rebalance_positions != 0]
+    rebalance_orders = app.calculate_rebalance_orders(
+        next_positions=next_positions)
 
     placed_orders_of_current_date = False
     is_placeable = not placed_orders_of_current_date and len(
-        rebalance_positions) > 0
+        rebalance_orders) > 0
     if is_placeable:
         st.button("Place orders", on_click=place_orders_callback)
-        st.subheader("Rebalance positions")
-        st.table(rebalance_positions)
+        st.subheader("Orders will be rebalancing")
+        st.table(rebalance_orders)
 
     # Display rebalancing positions
     st.subheader("Zscore Spread")
