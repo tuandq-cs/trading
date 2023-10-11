@@ -4,9 +4,8 @@ import streamlit as st
 from constants.error import err_not_support_instrument
 
 from constants.url import INTERACTIVE_BROKER_BASE_URL
-from pkg.brokers.interactive_broker import ERR_UNAUTHENTICATED_CLIENT_PORTAL_GATEWAY, InteractiveBrokers
+from pkg.brokers.interactive_broker import InteractiveBrokers
 from pkg.data_provider.wrapper import DataProviderWrapper
-from pkg.instrument.model import Instrument
 from pkg.order.model import Order, OrderSide
 from pkg.order.service import OrderService
 from pkg.portfolio.model import Portfolio
@@ -51,7 +50,7 @@ class App():
 
     def calculate_rebalance_orders(self, next_positions: pd.Series) -> pd.Series:
         current_portfolio = self.get_current_portfolio()
-        positions_df = current_portfolio.get_positions_df().set_index('instrument')
+        positions_df = current_portfolio.get_positions_df()
         current_positions = positions_df['position']
         rebalance_orders = next_positions.subtract(
             current_positions, fill_value=0)
@@ -70,6 +69,9 @@ class App():
             orders.append(Order(instrument=instrument, quantity=abs(qty),
                           side=side))
         self.order_service.place_orders(orders=orders)
+
+    def save_current_positions(self):
+        self.portfolio_service.save_current_portfolio()
 
     def get_orders_history(self) -> pd.DataFrame:
         return self.order_service.get_orders_history_df()

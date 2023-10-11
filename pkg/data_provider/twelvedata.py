@@ -20,4 +20,4 @@ class TwelveData():
             f"&start_date={start_date.strftime('%Y-%m-%d')}"
         response = requests.get(url, timeout=60)
         return pd.read_csv(io.StringIO(
-            response.content.decode('utf-8')), delimiter=";").set_index("datetime")
+            response.content.decode('utf-8')), delimiter=";")

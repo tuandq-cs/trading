@@ -37,8 +37,6 @@ class MeanReversionStrategy:
                 instrument=instrument, start_date=START_HISTORICAL_DATE
             )
             price_map[str(instrument)] = historical_data['close']
-        # data_df = pd.DataFrame(historical_data_table)
-
         price = pd.DataFrame(price_map).sort_index()
         hedge_ratio = self.__get_hedge_ratio(price=price)
         mkt_value = price * hedge_ratio

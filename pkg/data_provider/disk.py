@@ -22,7 +22,7 @@ class Disk:
         file_name = f"{self.__get_data_dir()}/{instrument}.csv"
         if not os.path.exists(file_name):
             raise ERR_DATA_NOT_IN_DISK
-        return pd.read_csv(file_name, delimiter=",").set_index("datetime")
+        return pd.read_csv(file_name, delimiter=",")
 
     def save_historical_data(self, instrument: Instrument, data: pd.DataFrame):
         file_name = f"{self.__get_data_dir()}/{instrument}.csv"

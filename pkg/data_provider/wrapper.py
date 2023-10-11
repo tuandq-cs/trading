@@ -18,12 +18,17 @@ class DataProviderWrapper():
 
     def load_historical_data(self, instrument: Instrument, start_date: datetime.datetime) -> pd.DataFrame:
         try:
-            return self.__disk.load_historical_data(instrument=instrument)
+            data = self.__disk.load_historical_data(instrument=instrument)
+            data.loc[:, 'datetime'] = pd.to_datetime(data['datetime'])
+            data.set_index("datetime", inplace=True)
+            return data
         except ValueError as err:
             if err is not ERR_DATA_NOT_IN_DISK:
                 raise err
             data = self.__twelve.load_historical_data(
                 instrument=instrument, start_date=start_date)
+            data.loc[:, 'datetime'] = pd.to_datetime(data['datetime'])
+            data.set_index("datetime", inplace=True)
             self.__disk.save_historical_data(
                 instrument=instrument, data=data)
             return data

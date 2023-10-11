@@ -92,6 +92,7 @@ class InteractiveBrokers:
         return list(self.__supported_instrument_map.values())
 
     def get_current_portfolio(self) -> Portfolio:
+        # TODO: handle for other page_id
         page_id = 0
         response = requests.get(
             f"{self.__base_url}/v1/api/portfolio/{self.__selected_account}/positions/{page_id}", timeout=self.__timeout_second,
@@ -99,6 +100,7 @@ class InteractiveBrokers:
         if response.status_code != 200:
             raise ERR_UNAUTHENTICATED_CLIENT_PORTAL_GATEWAY
         current_positions: list[PositionDetail] = []
+        now = datetime.datetime.now().astimezone()
         for item in response.json():
             # TODO: handle instrument_type
             instrument = Instrument(
@@ -106,7 +108,7 @@ class InteractiveBrokers:
             if self.__supported_instrument_map.get(item['conid']):
                 instrument = self.__supported_instrument_map[item['conid']]
             current_positions.append(PositionDetail(
-                instrument=instrument, position=item['position']))
+                instrument=instrument, position=item['position'], at=now))
         return Portfolio(positions=current_positions)
 
     def place_orders(self, orders: List[Order]) -> List[Order]:
