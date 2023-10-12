@@ -1,3 +1,5 @@
 broker,symbol,broker_instrument_id,position,at
 InteractiveBrokers,VDE,27684036,-1.4198,1697010641.467971
 InteractiveBrokers,IYE,10190340,3.1643,1697010641.467971
+InteractiveBrokers,VDE,27684036,-2.0785,1697100411.683957
+InteractiveBrokers,IYE,10190340,5.2152,1697100411.683957
