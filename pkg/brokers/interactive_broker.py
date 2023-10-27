@@ -32,6 +32,9 @@ class InteractiveBrokers:
     __PREDEFINED_INSTRUMENT_CONFIGS = [
         InstrumentConfig(symbol='IYE', type='ETF', conid='10190340'),
         InstrumentConfig(symbol='VDE', type='ETF', conid='27684036'),
+        InstrumentConfig(symbol='XLE', type='ETF', conid='4215217'),
+        InstrumentConfig(symbol='FENY', type='ETF', conid='137229016'),
+        InstrumentConfig(symbol='XES', type='ETF', conid='413951493'),
     ]
     __timeout_second: int = 60
     __supported_instrument_map: dict[str, Instrument] = {}
@@ -81,7 +84,7 @@ class InteractiveBrokers:
                     raise ValueError(
                         f"Unmatch conid of instrument {instrument_config.symbol}")
                 supported_instrument_map[instrument_config.conid] = Instrument(
-                    symbol=instrument_config.symbol, instrument_type=instrument_config.type, broker=self.__name, broker_instrument_id=instrument_config.conid)
+                    symbol=instrument_config.symbol, type=instrument_config.type, broker=self.__name, broker_instrument_id=instrument_config.conid)
             except requests.exceptions.RequestException:
                 raise ERR_UNAUTHENTICATED_CLIENT_PORTAL_GATEWAY
         self.__supported_instrument_map = supported_instrument_map
@@ -104,7 +107,7 @@ class InteractiveBrokers:
         for item in response.json():
             # TODO: handle instrument_type
             instrument = Instrument(
-                symbol=item['contractDesc'], instrument_type='', broker=self.__name, broker_instrument_id=item['conid'])
+                symbol=item['contractDesc'], type='', broker=self.__name, broker_instrument_id=item['conid'])
             if self.__supported_instrument_map.get(item['conid']):
                 instrument = self.__supported_instrument_map[item['conid']]
             current_positions.append(PositionDetail(

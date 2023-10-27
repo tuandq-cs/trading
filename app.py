@@ -6,6 +6,7 @@ from constants.error import err_not_support_instrument
 from constants.url import INTERACTIVE_BROKER_BASE_URL
 from pkg.brokers.interactive_broker import InteractiveBrokers
 from pkg.data_provider.wrapper import DataProviderWrapper
+from pkg.instrument.model import Instrument
 from pkg.order.model import Order, OrderSide
 from pkg.order.service import OrderService
 from pkg.portfolio.model import Portfolio
@@ -19,6 +20,14 @@ class App():
     order_service: OrderService
     data_provider: DataProviderWrapper
     mean_reversion_strategy: MeanReversionStrategy
+
+    __SUPPORTED_INSTRUMENTS = [
+        Instrument(symbol='IYE'),
+        Instrument(symbol='VDE'),
+        Instrument(symbol='XLE'),
+        Instrument(symbol='FENY'),
+        Instrument(symbol='XES')
+    ]
 
     def __init__(self) -> None:
         self.broker = InteractiveBrokers(base_url=INTERACTIVE_BROKER_BASE_URL)
@@ -37,6 +46,12 @@ class App():
             st.write("Please login first")
             st.link_button("Login", INTERACTIVE_BROKER_BASE_URL)
             st.stop()
+
+    def get_instrument_map_for_backtest(self) -> dict:
+        instrument_map = {}
+        for instrument in self.__SUPPORTED_INSTRUMENTS:
+            instrument_map[str(instrument)] = instrument
+        return instrument_map
 
     def get_instrument_map(self) -> dict:
         instruments = self.broker.get_supported_instruments()
