@@ -68,7 +68,7 @@ class MeanReversionStrategy:
         num_units = long_num_units + short_num_units
         return zscore_spread, hedge_ratio.mul(num_units, axis=0)
 
-    def backtest(self, instruments: List[Instrument]):
+    def backtest1(self, instruments: List[Instrument]):
         from sklearn.model_selection import train_test_split
         from sklearn.model_selection import TimeSeriesSplit
         # get historical data

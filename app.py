@@ -1,6 +1,8 @@
-from typing import List
+from typing import List, Tuple
 import pandas as pd
+from sklearn.model_selection import TimeSeriesSplit
 import streamlit as st
+from constants.common import START_HISTORICAL_DATE
 from constants.error import err_not_support_instrument
 
 from constants.url import INTERACTIVE_BROKER_BASE_URL
@@ -38,6 +40,12 @@ class App():
         self.mean_reversion_strategy = MeanReversionStrategy(
             data_provider=self.data_provider)
 
+    def check_auth(self):
+        try:
+            self.broker.auth()
+        except ValueError as err:
+            return err
+
     def fetch_session(self):
         try:
             self.broker.auth()
@@ -59,6 +67,24 @@ class App():
         for instrument in instruments:
             instrument_map[str(instrument)] = instrument
         return instrument_map
+
+    def get_historical_data(self, instruments: List[Instrument]) -> pd.DataFrame:
+        price_map = {}
+        for instrument in instruments:
+            historical_data = self.data_provider.load_historical_data(
+                instrument=instrument, start_date=START_HISTORICAL_DATE
+            )
+            price_map[str(instrument)] = historical_data['close']
+        return pd.DataFrame(price_map).sort_index()
+
+    def split_historical_data(self, historical_data: pd.DataFrame, num_folds: int) -> List[Tuple]:
+        tscv = TimeSeriesSplit(n_splits=num_folds)
+        folds = []
+        for _, (train_indices, valid_indices) in enumerate(tscv.split(historical_data)):
+            train_data, valid_data = historical_data.iloc[
+                train_indices], historical_data.iloc[valid_indices]
+            folds.append((train_data, valid_data))
+        return folds
 
     def get_current_portfolio(self) -> Portfolio:
         return self.portfolio_service.get_current_portfolio()
@@ -92,6 +118,6 @@ class App():
         return self.order_service.get_orders_history_df()
 
 
-@st.cache_resource
+# @st.cache_resource
 def init_app() -> App:
     return App()
