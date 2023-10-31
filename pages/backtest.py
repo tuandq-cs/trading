@@ -10,7 +10,9 @@ __SUPPORTED_INSTRUMENTS = [
     Instrument(symbol='VDE'),
     Instrument(symbol='XLE'),
     Instrument(symbol='FENY'),
-    Instrument(symbol='XES')
+    Instrument(symbol='XES'),
+    Instrument(symbol='EWC'),
+    Instrument(symbol='EWA')
 ]
 
 
@@ -26,6 +28,7 @@ st.info("""
 # Input parameter section
 st.header("Input parameters")
 chosen_instruments = st.multiselect("Instruments", __SUPPORTED_INSTRUMENTS)
+input_completed = len(chosen_instruments) >= 2
 st.divider()
 # Live trading section
 live_trading_container = st.container()
@@ -43,6 +46,8 @@ else:
 
 st.divider()
 # Backtest section
+if not input_completed:
+    st.stop()
 backtest_container = st.container()
 
 backtest_container.header("Backtest")
@@ -55,8 +60,12 @@ backtest_container.line_chart(historical_data)
 
 backtest_container.subheader("In sample dataset")
 num_folds = backtest_container.slider("Number of folds", 3, 5)
+folds = app.split_historical_data(
+    historical_data=historical_data, num_folds=num_folds)
+for i, tab in enumerate(backtest_container.tabs([f"Fold {i+1}" for i in range(num_folds)])):
+    train_data, valid_data = folds[i]
+    pnl = app.mean_reversion_strategy.get_trading_result(train_data)
+    tab.line_chart(pnl)
 
-for tab in backtest_container.tabs([f"Fold {i+1}" for i in range(num_folds)]):
-    tab.write("Hello")
 
 backtest_container.subheader("Out sample test")

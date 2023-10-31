@@ -5,6 +5,7 @@ import math
 import plotly.figure_factory as ff
 from scipy import linalg
 from scipy import stats
+from pykalman import KalmanFilter
 
 import pandas as pd
 from constants.common import START_HISTORICAL_DATE
@@ -34,6 +35,94 @@ class MeanReversionStrategy:
             jres = coint_johansen(price_period, det_order=0, k_ar_diff=1)
             hedge_ratio.iloc[i] = jres.evec.T[0]
         return hedge_ratio
+
+    def calc_trading_inputs(self, price: pd.DataFrame):
+        observed_column, remaining_columns = price.columns[0], price.columns[1:]
+        num_data_points, num_states = len(price), len(remaining_columns) + 1
+        measurement_vectors = price[observed_column].values
+        observation_matrices = np.concatenate(
+            [price[remaining_columns].values, np.ones((len(price), 1))], axis=1).reshape((num_data_points, 1, num_states))
+        # State transition matrix
+        F = np.eye(num_states)
+        # Initialize estimated state, estimated state variance
+        est_states = np.empty((num_data_points, num_states))
+        est_state_covariances = np.empty(
+            (num_data_points, num_states, num_states))
+        # There is a method to estimate these variances from data
+        # For keep simplicity, pick theses as author mentioned
+        delta = 0.0001
+        process_noise_err = delta / (1 - delta) * np.eye(num_states)
+        measurement_err = 0.001
+
+        pred_measurement_covariances = np.empty(
+            (num_data_points, 1, 1))
+        pred_measurement_errors = np.empty((num_data_points, 1))
+        for i in range(num_data_points):
+            # State extrapolation from t-1
+            pred_state = F.dot(
+                est_states[i-1]) if i > 0 else np.zeros(num_states)
+            # Covariance extrapolation from t-1
+            pred_state_cov = F.dot(est_state_covariances[i-1]).dot(
+                F.T) + process_noise_err if i > 0 else np.zeros((num_states, num_states))
+
+            # Measurement prediction from t - 1
+            pred_measurement = np.matmul(
+                observation_matrices[i], pred_state)
+            # Measurement variance prediction from t - 1
+            pred_measurement_covariances[i] = observation_matrices[i].dot(
+                pred_state_cov).dot(observation_matrices[i].T) + measurement_err
+            # Measurement at t
+            pred_measurement_errors[i] = measurement_vectors[i] - \
+                pred_measurement
+            # Kalman Gain
+            K = pred_state_cov.dot(observation_matrices[i].T.dot(
+                linalg.pinv(pred_measurement_covariances[i])))
+            # State update
+            est_states[i] = pred_state + K.dot(pred_measurement_errors[i])
+            # State variance update
+            est_state_covariances[i] = pred_state_cov - \
+                K.dot(observation_matrices[i].dot(pred_state_cov))
+        hedge_ratio = np.concatenate([np.ones((num_data_points, 1)),  est_states * -1],
+                                     axis=1)[:, :len(price.columns)]
+        hedge_ratio[:2].fill(np.NaN)
+        pred_measurement_errors[:2].fill(np.NaN)
+        pred_measurement_covariances[:2].fill(np.NaN)
+        hedge_ratio = pd.DataFrame(
+            hedge_ratio, columns=price.columns, index=price.index)
+
+        spread = pd.Series(pred_measurement_errors[:, 0], index=price.index)
+        spread_std = pd.Series(
+            np.sqrt(pred_measurement_covariances[:, 0, 0]), index=price.index)
+        return hedge_ratio, spread, spread_std
+
+    def get_trading_result(self, price: pd.DataFrame):
+        hedge_ratio, spread, spread_std = self.calc_trading_inputs(price=price)
+        num = 1
+        long_entry_signal = spread < -num*spread_std
+        long_exit_signal = spread >= -num*spread_std
+        long_num_units = pd.Series(np.NaN, index=price.index)
+        long_num_units.iloc[0] = 0
+        long_num_units[long_entry_signal] = 1
+        long_num_units[long_exit_signal] = 0
+        long_num_units = long_num_units.fillna(method='ffill')
+
+        short_entry_signal = spread > num*spread_std
+        short_exit_signal = spread <= num*spread_std
+        short_num_units = pd.Series(np.NaN, index=price.index)
+        short_num_units.iloc[0] = 0
+        short_num_units[short_entry_signal] = -1
+        short_num_units[short_exit_signal] = 0
+        short_num_units = short_num_units.fillna(method='ffill')
+
+        num_units = long_num_units + short_num_units
+        position = price * hedge_ratio.mul(num_units, axis=0)
+        pnl = (price - price.shift(1))/price.shift(1) * position.shift(1)
+        pnl = pnl.sum(axis=1)
+        ret = pnl / position.shift(1).sum(axis=1).abs()
+        print('pnl', pnl.describe())
+        print('ret', ret.describe())
+        return ret.dropna().cumsum()
+        # return pd.DataFrame({'spread': spread, 'std': spread_std, '-std': -1 * spread_std})
 
     def generate_trading_signal(self, instruments: List[Instrument]):
         price_map = {}
@@ -187,7 +276,6 @@ def get_leverage_ratio(ret: pd.Series):
 
 
 def get_hedge_ratio_v2(price: pd.DataFrame):
-    from pykalman import KalmanFilter
     observed_column, remaining_columns = price.columns[0], price.columns[1:]
     num_data_points, num_states = len(price), len(remaining_columns) + 1
     obs_matrices = np.concatenate(
