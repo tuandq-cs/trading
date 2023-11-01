@@ -14,6 +14,8 @@ from statsmodels.tsa.vector_ar.vecm import coint_johansen
 from pkg.data_provider.wrapper import DataProviderWrapper
 from pkg.instrument.model import Instrument
 
+from constants.common import calc_drawdown
+
 
 class MeanReversionStrategy:
     __data_provider: DataProviderWrapper
@@ -95,19 +97,17 @@ class MeanReversionStrategy:
             np.sqrt(pred_measurement_covariances[:, 0, 0]), index=price.index)
         return hedge_ratio, spread, spread_std
 
-    def get_trading_result(self, price: pd.DataFrame):
-        hedge_ratio, spread, spread_std = self.calc_trading_inputs(price=price)
-        num = 1
-        long_entry_signal = spread < -num*spread_std
-        long_exit_signal = spread >= -num*spread_std
+    def trade(self, price: pd.DataFrame, hedge_ratio: pd.DataFrame, spread: pd.Series, spread_std: pd.Series):
+        long_entry_signal = spread < -spread_std
+        long_exit_signal = spread >= -spread_std
         long_num_units = pd.Series(np.NaN, index=price.index)
         long_num_units.iloc[0] = 0
         long_num_units[long_entry_signal] = 1
         long_num_units[long_exit_signal] = 0
         long_num_units = long_num_units.fillna(method='ffill')
 
-        short_entry_signal = spread > num*spread_std
-        short_exit_signal = spread <= num*spread_std
+        short_entry_signal = spread > spread_std
+        short_exit_signal = spread <= spread_std
         short_num_units = pd.Series(np.NaN, index=price.index)
         short_num_units.iloc[0] = 0
         short_num_units[short_entry_signal] = -1
@@ -115,14 +115,17 @@ class MeanReversionStrategy:
         short_num_units = short_num_units.fillna(method='ffill')
 
         num_units = long_num_units + short_num_units
+        if (num_units == 0).all():
+            raise ValueError("Not have any entry signal")
         position = price * hedge_ratio.mul(num_units, axis=0)
         pnl = (price - price.shift(1))/price.shift(1) * position.shift(1)
         pnl = pnl.sum(axis=1)
         ret = pnl / position.shift(1).sum(axis=1).abs()
-        print('pnl', pnl.describe())
-        print('ret', ret.describe())
-        return ret.dropna().cumsum()
-        # return pd.DataFrame({'spread': spread, 'std': spread_std, '-std': -1 * spread_std})
+        sharp_ratio = math.sqrt(252)*ret.mean()/ret.std()
+        max_drawdown_deep, max_drawdown_duration = calc_drawdown(ret)
+        # Halflife
+        # Annual percentage rate
+        return ret, sharp_ratio, max_drawdown_deep, max_drawdown_duration
 
     def generate_trading_signal(self, instruments: List[Instrument]):
         price_map = {}

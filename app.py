@@ -68,18 +68,18 @@ class App():
             instrument_map[str(instrument)] = instrument
         return instrument_map
 
-    def get_historical_data(self, instruments: List[Instrument]) -> pd.DataFrame:
+    def get_historical_data(self, instruments: List[Instrument], start_date=START_HISTORICAL_DATE) -> pd.DataFrame:
         price_map = {}
         for instrument in instruments:
             historical_data = self.data_provider.load_historical_data(
-                instrument=instrument, start_date=START_HISTORICAL_DATE
+                instrument=instrument, start_date=start_date
             )
             price_map[str(instrument)] = historical_data['close']
         return pd.DataFrame(price_map).sort_index()
 
-    def split_historical_data(self, historical_data: pd.DataFrame, num_folds: int) -> List[Tuple]:
+    def split_historical_data(self, historical_data: pd.DataFrame, num_folds: int):
         tscv = TimeSeriesSplit(n_splits=num_folds)
-        folds = []
+        folds: List[Tuple[pd.DataFrame, pd.DataFrame]] = []
         for _, (train_indices, valid_indices) in enumerate(tscv.split(historical_data)):
             train_data, valid_data = historical_data.iloc[
                 train_indices], historical_data.iloc[valid_indices]
