@@ -7,6 +7,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 import streamlit as st
 from app import init_app
+from constants.common import calc_drawdown, calc_sharp_ratio
 from constants.url import INTERACTIVE_BROKER_BASE_URL
 from pkg.instrument.model import Instrument
 
@@ -16,10 +17,11 @@ __SUPPORTED_INSTRUMENTS = [
     Instrument(symbol='IYE'),
     Instrument(symbol='VDE'),
     Instrument(symbol='XLE'),
-    Instrument(symbol='FENY'),
+    # Instrument(symbol='XLU'),
+    # Instrument(symbol='FENY'),
     Instrument(symbol='XES'),
-    Instrument(symbol='EWC'),
-    Instrument(symbol='EWA')
+    # Instrument(symbol='EWC'),
+    # Instrument(symbol='EWA')
 ]
 
 
@@ -75,77 +77,85 @@ backtest_container.line_chart(historical_data)
 insample_section, outsample_section = backtest_container.tabs(
     ['IS Summary', 'OS Summary'])
 # In sample section
-insample_section.subheader("Input")
-num_folds = insample_section.slider("Number of folds", 3, 5)
+start_date, end_date = pd.Timestamp(
+    in_sample_dataset.index.min()), pd.Timestamp(in_sample_dataset.index.max())
+insample_section.metric(f"Date Range", f"{start_date.strftime('%Y/%m/%d')} - {end_date.strftime('%Y/%m/%d')}",
+                        f"{end_date - start_date}")
 
-insample_section.subheader("Cross validation")
-folds = app.split_historical_data(
-    historical_data=historical_data, num_folds=num_folds)
-for i, tab in enumerate(insample_section.tabs([f"Fold {i+1}" for i in range(num_folds)])):
-    train_data, valid_data = folds[i]
-    fold_data = [train_data, valid_data]
-    labels = ['Train', 'Valid']
 
-    for j in range(len(labels)):
-        data = fold_data[j]
-        start_date, end_date = pd.Timestamp(
-            data.index.min()), pd.Timestamp(data.index.max())
-        tab.metric(f"{labels[j]} Date Range", f"{start_date.strftime('%Y/%m/%d')} - {end_date.strftime('%Y/%m/%d')}",
-                   f"{end_date - start_date}")
+hedge_ratio, spread, spread_std = app.mean_reversion_strategy.calc_trading_inputs(
+    price=in_sample_dataset)
+ret = app.mean_reversion_strategy.trade(
+    in_sample_dataset, hedge_ratio, spread, spread_std)
+# levered_result = app.mean_reversion_strategy.get_leverage_ratio(ret)
+# insample_section.write(levered_result)
 
-    for j, subtab in enumerate(tab.tabs(labels)):
-        data = fold_data[j]
-        # Cointegration statistic
-        subtab.text("Cointegration statistic")
-        jres = coint_johansen(data, det_order=0, k_ar_diff=1)
-        coint_result = pd.DataFrame(np.concatenate([jres.max_eig_stat.reshape(-1, 1), jres.max_eig_stat_crit_vals], axis=1),
-                                    columns=['Statistic', 'Crit 90%', 'Crit 95%', 'Crit 99%'])
-        subtab.table(coint_result)
-        hedge_ratio, spread, spread_std = app.mean_reversion_strategy.calc_trading_inputs(
-            price=data)
-        # Result
-        subtab.text("Result")
-        try:
-            ret, sharp_ratio, max_drawdown_deep, max_drawdown_duration = app.mean_reversion_strategy.trade(
-                data, hedge_ratio, spread, spread_std)
-            subtab.metric("Sharp ratio", round(sharp_ratio, 2))
-            col_max_drawdown_deep, col_max_drawdown_duration = subtab.columns(
-                2)
-            col_max_drawdown_deep.metric("Max drawdown",
-                                         f"-{round(max_drawdown_deep['drawdown_deep'], 2)}%")
-            col_max_drawdown_duration.metric("Max drawdown duration",
-                                             f"{max_drawdown_duration['drawdown_duration']}")
-            metric_detail = subtab.expander("Detail")
-            with metric_detail:
-                col1, col2 = metric_detail.columns(2)
-            with col1:
-                col1.text("Max drawdown")
-                col1.write(max_drawdown_deep)
-            with col2:
-                col2.text("Max drawdown duration")
-                col2.write(max_drawdown_duration)
-            subtab.line_chart(ret.dropna().cumsum())
-        except ValueError as err:
-            subtab.warning(err)
+# Cointegration statistic
+insample_section.text("Cointegration statistic")
+jres = coint_johansen(in_sample_dataset, det_order=0, k_ar_diff=1)
+coint_result = pd.DataFrame(np.concatenate([jres.max_eig_stat.reshape(-1, 1), jres.max_eig_stat_crit_vals], axis=1),
+                            columns=['Statistic', 'Crit 90%', 'Crit 95%', 'Crit 99%'])
+insample_section.table(coint_result)
+halflife = app.mean_reversion_strategy.calc_halflife(
+    spread=(hedge_ratio*in_sample_dataset).sum(axis=1))
+insample_section.metric("Halflife", halflife)
 
-        # Spread & Std
-        subtab.text("Spread & Std")
+insample_section.metric("Sharp ratio", round(calc_sharp_ratio(ret), 2))
+insample_section.metric("Trades", ret.count())
 
-        spread_summary = subtab.expander("Summary")
-        with spread_summary:
-            col1, col2 = spread_summary.columns(2)
-            with col1:
-                col1.text("Spread")
-                col1.text(spread.describe())
-            with col2:
-                col2.text("Spread Std")
-                col2.text(spread_std.describe())
+# Drawdown
+drawdown = calc_drawdown(ret)
+max_drawdown = drawdown.loc[drawdown['drawdown_deep'].idxmax()] if len(
+    drawdown) > 0 else None
+max_drawdown_duration = drawdown.loc[drawdown['drawdown_duration'].idxmax()] if len(
+    drawdown) > 0 else None
+if max_drawdown is not None and max_drawdown_duration is not None:
+    col_max_drawdown_deep, col_max_drawdown_duration = insample_section.columns(
+        2)
+    col_max_drawdown_deep.metric("Max drawdown",
+                                 f"-{round(max_drawdown['drawdown_deep']*100, 2)}%")
+    col_max_drawdown_duration.metric("Max drawdown duration",
+                                     f"{max_drawdown_duration['drawdown_duration']}")
+metric_detail = insample_section.expander("Detail")
+with metric_detail:
+    metric_detail.text("Return")
+    metric_detail.write(ret.describe())
+    col1, col2 = metric_detail.columns(2)
+    with col1:
+        col1.text("Max drawdown")
+        col1.write(max_drawdown)
+    with col2:
+        col2.text("Max drawdown duration")
+        col2.write(max_drawdown_duration)
 
-        subtab.line_chart(pd.DataFrame({
-            'spread': spread,
-            'std': spread_std,
-            '-std': -spread_std
-        }))
+aggregrated_by_year = ret.groupby(ret.index.year).agg(
+    sharp_ratio=calc_sharp_ratio,
+    max_drawdown_deep=lambda x: calc_drawdown(x)['drawdown_deep'].max(),
+    max_drawdown_duration=lambda x: calc_drawdown(
+        x)['drawdown_duration'].max(),
+)
+aggregrated_by_year['max_drawdown_duration'] = aggregrated_by_year['max_drawdown_duration'].dt.days
+insample_section.table(aggregrated_by_year)
 
+insample_section.line_chart(ret.dropna().cumsum())
+
+
+# Spread & Std
+insample_section.text("Spread & Std")
+spread_summary = insample_section.expander("Summary")
+with spread_summary:
+    col1, col2 = spread_summary.columns(2)
+    with col1:
+        col1.text("Spread")
+        col1.text(spread.describe())
+    with col2:
+        col2.text("Spread Std")
+        col2.text(spread_std.describe())
+
+insample_section.line_chart(pd.DataFrame({
+    'spread': spread,
+    'std': spread_std,
+    '-std': -spread_std
+}))
 
 outsample_section.subheader("Out sample test")

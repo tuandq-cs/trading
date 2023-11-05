@@ -13,6 +13,7 @@ from constants.common import START_HISTORICAL_DATE
 from statsmodels.tsa.vector_ar.vecm import coint_johansen
 from pkg.data_provider.wrapper import DataProviderWrapper
 from pkg.instrument.model import Instrument
+import statsmodels.api as sm
 
 from constants.common import calc_drawdown
 
@@ -37,6 +38,40 @@ class MeanReversionStrategy:
             jres = coint_johansen(price_period, det_order=0, k_ar_diff=1)
             hedge_ratio.iloc[i] = jres.evec.T[0]
         return hedge_ratio
+
+    def calc_halflife(self, spread: pd.Series):
+        x = spread.shift().dropna()
+        y = spread - spread.shift()
+        y = y.dropna()
+        x = sm.add_constant(x)
+        results = sm.OLS(y, x).fit()
+        return -math.log(2) / results.params[0]
+
+    def get_leverage_ratio(self, ret: pd.Series):
+        leverage_lookback = 20 * 6
+        base_equity = 1000
+        result_df = pd.DataFrame(np.NaN, index=ret.index, columns=[
+            'ratio', 'equity', 'capital', 'ret'])
+        latest_ret_row = None
+        for i in range(leverage_lookback, len(ret)):
+            if latest_ret_row is None:
+                equity = base_equity
+                ratio = 1
+            else:
+                equity = latest_ret_row['equity'] + \
+                    latest_ret_row['ret']*latest_ret_row['capital']
+                r = ret.dropna().iloc[i-leverage_lookback:i]
+                ratio = max(r.mean() / (r.std())**2, 0) / 2
+            # ratio = min(4, ratio)
+            capital = equity * ratio
+            result_df.iloc[i]['capital'] = capital
+            result_df.iloc[i]['equity'] = equity
+            result_df.iloc[i]['ratio'] = ratio
+            result_df.iloc[i]['ret'] = ret[i]
+            if not np.isnan(ret[i]):
+                latest_ret_row = result_df.iloc[i]
+
+        return result_df
 
     def calc_trading_inputs(self, price: pd.DataFrame):
         observed_column, remaining_columns = price.columns[0], price.columns[1:]
@@ -98,16 +133,17 @@ class MeanReversionStrategy:
         return hedge_ratio, spread, spread_std
 
     def trade(self, price: pd.DataFrame, hedge_ratio: pd.DataFrame, spread: pd.Series, spread_std: pd.Series):
-        long_entry_signal = spread < -spread_std
-        long_exit_signal = spread >= -spread_std
+        num = 1
+        long_entry_signal = spread < -spread_std * num
+        long_exit_signal = spread >= -spread_std * num
         long_num_units = pd.Series(np.NaN, index=price.index)
         long_num_units.iloc[0] = 0
         long_num_units[long_entry_signal] = 1
         long_num_units[long_exit_signal] = 0
         long_num_units = long_num_units.fillna(method='ffill')
 
-        short_entry_signal = spread > spread_std
-        short_exit_signal = spread <= spread_std
+        short_entry_signal = spread > spread_std * num
+        short_exit_signal = spread <= spread_std * num
         short_num_units = pd.Series(np.NaN, index=price.index)
         short_num_units.iloc[0] = 0
         short_num_units[short_entry_signal] = -1
@@ -120,12 +156,9 @@ class MeanReversionStrategy:
         position = price * hedge_ratio.mul(num_units, axis=0)
         pnl = (price - price.shift(1))/price.shift(1) * position.shift(1)
         pnl = pnl.sum(axis=1)
-        ret = pnl / position.shift(1).sum(axis=1).abs()
-        sharp_ratio = math.sqrt(252)*ret.mean()/ret.std()
-        max_drawdown_deep, max_drawdown_duration = calc_drawdown(ret)
-        # Halflife
-        # Annual percentage rate
-        return ret, sharp_ratio, max_drawdown_deep, max_drawdown_duration
+        # BE CAREFUL WITH ORDER OF ABS, SUM. REVERSE WILL PRODUCE ERROR
+        ret = pnl / position.shift(1).abs().sum(axis=1)
+        return ret
 
     def generate_trading_signal(self, instruments: List[Instrument]):
         price_map = {}
@@ -404,7 +437,6 @@ def get_trading_result(lookback, price):
 
 
 def get_trading_params(train_data: pd.DataFrame):
-    import statsmodels.api as sm
     jres = coint_johansen(train_data, det_order=0, k_ar_diff=1)
     w1 = jres.evec.T[0]
     weights = pd.DataFrame([w1] * len(train_data),
