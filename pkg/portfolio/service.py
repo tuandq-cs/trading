@@ -20,3 +20,6 @@ class PortfolioService:
         # Save current positions
         self.__repo.save_positions(current_portfolio.get_positions())
         # TODO: Save other things (cash, margin, ...)
+
+    def get_positions_history(self):
+        return self.__repo.get_positions_history()

@@ -13,16 +13,38 @@ from pkg.instrument.model import Instrument
 
 from statsmodels.tsa.vector_ar.vecm import coint_johansen
 
+tz_local = datetime.datetime.now().astimezone().tzinfo
+
 __SUPPORTED_INSTRUMENTS = [
+    # Energy ETFs
     Instrument(symbol='IYE'),
     Instrument(symbol='VDE'),
     Instrument(symbol='XLE'),
+    Instrument(symbol='XOP'),
     # Instrument(symbol='XLU'),
-    # Instrument(symbol='FENY'),
     Instrument(symbol='XES'),
-    # Instrument(symbol='EWC'),
-    # Instrument(symbol='EWA')
+    # Uranium ETFs
+    Instrument(symbol='URA'),
+    Instrument(symbol='SRUUF'),
 ]
+
+
+def place_orders_callback():
+    try:
+        app.place_orders(rebalance_orders)
+    except ValueError as err:
+        st.toast(f"Got error: {err}")
+        st.stop()
+    st.balloons()
+
+
+def save_current_positions_callback():
+    try:
+        app.save_current_positions()
+    except ValueError as err:
+        st.toast(f"Got error: {err}")
+        st.stop()
+    st.balloons()
 
 
 app = init_app()
@@ -39,6 +61,13 @@ st.header("Input parameters")
 chosen_instruments = st.multiselect("Instruments", __SUPPORTED_INSTRUMENTS)
 input_completed = len(chosen_instruments) >= 2
 st.divider()
+
+if not input_completed:
+    st.stop()
+
+historical_data = app.get_historical_data(
+    instruments=chosen_instruments, start_date=datetime.datetime(2015, 1, 1))
+
 # Live trading section
 live_trading_container = st.container()
 live_trading_container.header("Live trading")
@@ -47,28 +76,62 @@ if auth_err:
     live_trading_container.write(f"Got auth error: {auth_err}")
     live_trading_container.link_button("Login", INTERACTIVE_BROKER_BASE_URL)
 else:
-    # Portfolio section
-    # Order section
-    live_trading_container.subheader("Order")
-    with live_trading_container.expander("Order section"):
-        st.write("Yeah")
+    current_portfolio = app.get_current_portfolio()
+    cash = current_portfolio.get_cash_balance()
+    cash_for_next_positions = cash / 2  # TODO: integrate with Kelly formula later
+    positions_df = current_portfolio.get_positions_df()
+    positions_df['at'] = positions_df['at'].dt.tz_convert(tz_local)
+    # Current positions
+    with live_trading_container.container():
+        live_trading_container.metric(
+            "Cash balance", cash)
+        live_trading_container.metric(
+            "Cash for next positions", cash_for_next_positions)
+        live_trading_container.subheader("Current positions")
+        _, col2 = live_trading_container.columns([8, 2])
+        col2.button("Save positions", on_click=save_current_positions_callback,
+                    type='primary', use_container_width=True)
+        live_trading_container.table(positions_df)
+        # Next positions
+        live_trading_container.subheader("Next positions")
+        hedge_ratio, spread, spread_std = app.mean_reversion_strategy.calc_trading_inputs(
+            price=historical_data.dropna())
+        next_hedge_ratio = hedge_ratio.sort_index().iloc[-1]
+        next_positions = next_hedge_ratio * cash_for_next_positions / (
+            next_hedge_ratio*historical_data.iloc[-1]).abs().sum()
+        live_trading_container.table(next_positions)
+
+        rebalance_orders = app.calculate_rebalance_orders(
+            next_positions=next_positions)
+
+        # TODO: think about other criteria
+        # Maybe sent orders but not filled -> need to block
+        is_placeable = rebalance_orders.any() != 0
+        live_trading_container.subheader("Orders will be rebalancing")
+        _, col2 = st.columns([8, 2])
+        if is_placeable:
+            col2.button("Place orders", on_click=place_orders_callback,
+                        type='primary', use_container_width=True)
+        live_trading_container.table(rebalance_orders)
+
+        # Pnl history
+        app.calc_pnl_history()
+        # live_trading_container.write(orders_history)
 
 st.divider()
-# Backtest section
-if not input_completed:
-    st.stop()
-backtest_container = st.container()
 
+# Backtest section
+
+backtest_container = st.container()
 backtest_container.header("Backtest")
 # TODO: Setup flow for date range backtest
 # date_range = st.date_input("Date range")
-historical_data = app.get_historical_data(
-    instruments=chosen_instruments, start_date=datetime.datetime(2015, 1, 1))
+
 start_date, end_date = pd.Timestamp(
     historical_data.index.min()), pd.Timestamp(historical_data.index.max())
 
 in_sample_dataset, out_sample_dataset = train_test_split(
-    historical_data, test_size=0.3, shuffle=False)
+    historical_data.dropna(), test_size=0.3, shuffle=False)
 
 backtest_container.metric(
     "Date range", f"{start_date.strftime('%Y/%m/%d')} - {end_date.strftime('%Y/%m/%d')}", f"{end_date - start_date}")
@@ -87,8 +150,8 @@ hedge_ratio, spread, spread_std = app.mean_reversion_strategy.calc_trading_input
     price=in_sample_dataset)
 ret = app.mean_reversion_strategy.trade(
     in_sample_dataset, hedge_ratio, spread, spread_std)
-# levered_result = app.mean_reversion_strategy.get_leverage_ratio(ret)
-# insample_section.write(levered_result)
+levered_result = app.mean_reversion_strategy.get_leverage_ratio(ret)
+insample_section.write(levered_result)
 
 # Cointegration statistic
 insample_section.text("Cointegration statistic")
@@ -118,8 +181,11 @@ if max_drawdown is not None and max_drawdown_duration is not None:
                                      f"{max_drawdown_duration['drawdown_duration']}")
 metric_detail = insample_section.expander("Detail")
 with metric_detail:
-    metric_detail.text("Return")
-    metric_detail.write(ret.describe())
+    col1, col2 = metric_detail.columns(2)
+    col1.text("Return summary")
+    col1.write(ret.describe())
+    col2.text("Return")
+    col2.write(ret)
     col1, col2 = metric_detail.columns(2)
     with col1:
         col1.text("Max drawdown")

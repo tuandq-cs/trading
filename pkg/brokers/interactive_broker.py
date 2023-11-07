@@ -11,6 +11,7 @@ from pkg.portfolio.model import Portfolio, PositionDetail
 ERR_UNAUTHENTICATED_CLIENT_PORTAL_GATEWAY = ValueError(
     'ERR_UNAUTHENTICATED_CLIENT_PORTAL_GATEWAY')
 ERR_NOT_FOUND_SELECTED_ACCOUNT = ValueError('ERR_NOT_FOUND_SELECTED_ACCOUNT')
+ERR_CASH_MUST_SUPPORT_USD = ValueError('ERR_CASH_MUST_SUPPORT_USD')
 
 
 def err_unauthenticated(response_body):
@@ -94,7 +95,7 @@ class InteractiveBrokers:
             self.__fetch_supported_instruments()
         return list(self.__supported_instrument_map.values())
 
-    def get_current_portfolio(self) -> Portfolio:
+    def __fetch_current_positions(self) -> List[PositionDetail]:
         # TODO: handle for other page_id
         page_id = 0
         response = requests.get(
@@ -112,7 +113,23 @@ class InteractiveBrokers:
                 instrument = self.__supported_instrument_map[item['conid']]
             current_positions.append(PositionDetail(
                 instrument=instrument, position=item['position'], at=now))
-        return Portfolio(positions=current_positions)
+        return current_positions
+
+    def __fetch_current_cash_balance(self) -> float:
+        response = requests.get(
+            f"{self.__base_url}/v1/api/portfolio/{self.__selected_account}/ledger", timeout=self.__timeout_second,
+            verify=False)
+        if response.status_code != 200:
+            raise ERR_UNAUTHENTICATED_CLIENT_PORTAL_GATEWAY
+        response_obj = response.json()
+        if not response_obj.get("USD"):
+            raise ERR_CASH_MUST_SUPPORT_USD
+        return response_obj['USD']['cashbalance']
+
+    def get_current_portfolio(self) -> Portfolio:
+        current_cash_balance = self.__fetch_current_cash_balance()
+        current_positions = self.__fetch_current_positions()
+        return Portfolio(cash_balance=current_cash_balance, positions=current_positions)
 
     def place_orders(self, orders: List[Order]) -> List[Order]:
         now = datetime.datetime.now()

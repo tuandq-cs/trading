@@ -27,13 +27,18 @@ class PositionDetail:
 
 
 class Portfolio:
+    __cash_balance: float
     __positions: List[PositionDetail]
 
-    def __init__(self, positions: List[PositionDetail]) -> None:
+    def __init__(self, cash_balance: float, positions: List[PositionDetail]) -> None:
+        self.__cash_balance = cash_balance
         self.__positions = positions
 
     def get_positions(self) -> List[PositionDetail]:
         return self.__positions
+
+    def get_cash_balance(self) -> float:
+        return self.__cash_balance
 
     def get_positions_df(self) -> pd.DataFrame:
         positions_df = pd.DataFrame([

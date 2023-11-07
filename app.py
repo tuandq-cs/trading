@@ -69,13 +69,15 @@ class App():
         return instrument_map
 
     def get_historical_data(self, instruments: List[Instrument], start_date=START_HISTORICAL_DATE) -> pd.DataFrame:
-        price_map = {}
+        df_list: list[pd.DataFrame] = []
         for instrument in instruments:
             historical_data = self.data_provider.load_historical_data(
                 instrument=instrument, start_date=start_date
             )
-            price_map[str(instrument)] = historical_data['close']
-        return pd.DataFrame(price_map).sort_index()
+            df_list.append(pd.DataFrame({
+                str(instrument): historical_data[~historical_data.index.duplicated()]['close']
+            }))
+        return pd.concat(df_list, axis=1).sort_index()
 
     def split_historical_data(self, historical_data: pd.DataFrame, num_folds: int):
         tscv = TimeSeriesSplit(n_splits=num_folds)
@@ -96,7 +98,7 @@ class App():
         rebalance_orders = next_positions.subtract(
             current_positions, fill_value=0)
         rebalance_orders = rebalance_orders.loc[next_positions.index]
-        return rebalance_orders[rebalance_orders != 0]
+        return rebalance_orders[rebalance_orders != 0].transform(lambda x: round(x, 4))
 
     def place_orders(self, orders_series: pd.Series):
         orders: List[Order] = []
@@ -116,6 +118,12 @@ class App():
 
     def get_orders_history(self) -> pd.DataFrame:
         return self.order_service.get_orders_history_df()
+
+    def calc_pnl_history(self):
+        positions_history = self.portfolio_service.get_positions_history()
+        positions_history['at'] = pd.to_datetime(
+            positions_history['at'], unit='s', utc=True)
+        print(positions_history)
 
 
 # @st.cache_resource

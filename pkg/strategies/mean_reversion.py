@@ -63,6 +63,7 @@ class MeanReversionStrategy:
                 r = ret.dropna().iloc[i-leverage_lookback:i]
                 ratio = max(r.mean() / (r.std())**2, 0) / 2
             # ratio = min(4, ratio)
+            ratio = 1
             capital = equity * ratio
             result_df.iloc[i]['capital'] = capital
             result_df.iloc[i]['equity'] = equity

@@ -25,6 +25,9 @@ class DiskStorage:
             positions_df.to_csv(
                 self.__position_history_file_path, mode='a', header=include_header, index=False)
 
+    def load_positions_history(self):
+        return pd.read_csv(self.__position_history_file_path)
+
 
 class PortfolioRepo:
     __disk_storage: DiskStorage
@@ -34,3 +37,6 @@ class PortfolioRepo:
 
     def save_positions(self, positions: List[PositionDetail]):
         self.__disk_storage.save_positions(positions=positions)
+
+    def get_positions_history(self):
+        return self.__disk_storage.load_positions_history()
