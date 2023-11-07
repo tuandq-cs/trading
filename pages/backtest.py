@@ -87,6 +87,10 @@ else:
             "Cash balance", cash)
         live_trading_container.metric(
             "Cash for next positions", cash_for_next_positions)
+        # Pnl history
+        pnl = app.calc_pnl_history()
+        live_trading_container.expander("PnL history").line_chart(pnl.cumsum())
+
         live_trading_container.subheader("Current positions")
         _, col2 = live_trading_container.columns([8, 2])
         col2.button("Save positions", on_click=save_current_positions_callback,
@@ -114,9 +118,6 @@ else:
                         type='primary', use_container_width=True)
         live_trading_container.table(rebalance_orders)
 
-        # Pnl history
-        app.calc_pnl_history()
-        # live_trading_container.write(orders_history)
 
 st.divider()
 

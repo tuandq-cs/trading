@@ -121,11 +121,18 @@ class App():
 
     def calc_pnl_history(self):
         positions_history = self.portfolio_service.get_positions_history()
-        positions_history['at'] = pd.to_datetime(
-            positions_history['at'], unit='s', utc=True)
-        print(positions_history)
-
+        positions_history['date'] = pd.to_datetime(
+            positions_history['at'], unit='s', utc=True).dt.date
+        positions_history = positions_history.pivot(
+            index='date', columns='symbol', values='position')
+        price = self.get_historical_data(
+            instruments=[Instrument(symbol=x) for x in positions_history.columns])
+        pnl = (price - price.shift(1)) / price.shift(1) * positions_history
+        pnl = pnl.dropna().sum(axis=1)
+        return pnl
 
 # @st.cache_resource
+
+
 def init_app() -> App:
     return App()
