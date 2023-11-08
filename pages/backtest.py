@@ -98,9 +98,16 @@ else:
         live_trading_container.table(positions_df)
         # Next positions
         live_trading_container.subheader("Next positions")
-        hedge_ratio, spread, spread_std = app.mean_reversion_strategy.calc_trading_inputs(
+        hedge_ratio, trading_signals, spread, spread_std = app.mean_reversion_strategy.calc_trading_inputs(
             price=historical_data.dropna())
-        next_hedge_ratio = hedge_ratio.sort_index().iloc[-1]
+        next_trading_signals = trading_signals.iloc[-1]
+        _, col2 = live_trading_container.columns([8, 2])
+        col2.toggle(
+            "Long signal", value=next_trading_signals == 1)
+        col2.toggle(
+            "Short signal", value=next_trading_signals == -1)
+        next_hedge_ratio = hedge_ratio.sort_index(
+        ).iloc[-1].mul(next_trading_signals)
         next_positions = next_hedge_ratio * cash_for_next_positions / (
             next_hedge_ratio*historical_data.iloc[-1]).abs().sum()
         live_trading_container.table(next_positions)
@@ -112,7 +119,7 @@ else:
         # Maybe sent orders but not filled -> need to block
         is_placeable = rebalance_orders.any() != 0
         live_trading_container.subheader("Orders will be rebalancing")
-        _, col2 = st.columns([8, 2])
+        _, col2 = live_trading_container.columns([8, 2])
         if is_placeable:
             col2.button("Place orders", on_click=place_orders_callback,
                         type='primary', use_container_width=True)
@@ -147,10 +154,10 @@ insample_section.metric(f"Date Range", f"{start_date.strftime('%Y/%m/%d')} - {en
                         f"{end_date - start_date}")
 
 
-hedge_ratio, spread, spread_std = app.mean_reversion_strategy.calc_trading_inputs(
+hedge_ratio, trading_signals, spread, spread_std = app.mean_reversion_strategy.calc_trading_inputs(
     price=in_sample_dataset)
-ret = app.mean_reversion_strategy.trade(
-    in_sample_dataset, hedge_ratio, spread, spread_std)
+ret = app.mean_reversion_strategy.backtest(
+    in_sample_dataset, hedge_ratio, trading_signals)
 levered_result = app.mean_reversion_strategy.get_leverage_ratio(ret)
 insample_section.write(levered_result)
 

@@ -127,7 +127,8 @@ class App():
             index='date', columns='symbol', values='position')
         price = self.get_historical_data(
             instruments=[Instrument(symbol=x) for x in positions_history.columns])
-        pnl = (price - price.shift(1)) / price.shift(1) * positions_history
+        pnl = (price - price.shift(1)) / \
+            price.shift(1) * positions_history.shift(1)
         pnl = pnl.dropna().sum(axis=1)
         return pnl
 

@@ -131,13 +131,15 @@ class MeanReversionStrategy:
         spread = pd.Series(pred_measurement_errors[:, 0], index=price.index)
         spread_std = pd.Series(
             np.sqrt(pred_measurement_covariances[:, 0, 0]), index=price.index)
-        return hedge_ratio, spread, spread_std
+        trading_signals = self.calc_trading_signals(
+            spread=spread, spread_std=spread_std)
+        return hedge_ratio, trading_signals, spread, spread_std
 
-    def trade(self, price: pd.DataFrame, hedge_ratio: pd.DataFrame, spread: pd.Series, spread_std: pd.Series):
+    def calc_trading_signals(self, spread: pd.Series, spread_std: pd.Series):
         num = 1
         long_entry_signal = spread < -spread_std * num
         long_exit_signal = spread >= -spread_std * num
-        long_num_units = pd.Series(np.NaN, index=price.index)
+        long_num_units = pd.Series(np.NaN, index=spread.index)
         long_num_units.iloc[0] = 0
         long_num_units[long_entry_signal] = 1
         long_num_units[long_exit_signal] = 0
@@ -145,7 +147,7 @@ class MeanReversionStrategy:
 
         short_entry_signal = spread > spread_std * num
         short_exit_signal = spread <= spread_std * num
-        short_num_units = pd.Series(np.NaN, index=price.index)
+        short_num_units = pd.Series(np.NaN, index=spread.index)
         short_num_units.iloc[0] = 0
         short_num_units[short_entry_signal] = -1
         short_num_units[short_exit_signal] = 0
@@ -154,7 +156,10 @@ class MeanReversionStrategy:
         num_units = long_num_units + short_num_units
         if (num_units == 0).all():
             raise ValueError("Not have any entry signal")
-        position = price * hedge_ratio.mul(num_units, axis=0)
+        return num_units
+
+    def backtest(self, price: pd.DataFrame, hedge_ratio: pd.DataFrame, trading_signals: pd.Series):
+        position = price * hedge_ratio.mul(trading_signals, axis=0)
         pnl = (price - price.shift(1))/price.shift(1) * position.shift(1)
         pnl = pnl.sum(axis=1)
         # BE CAREFUL WITH ORDER OF ABS, SUM. REVERSE WILL PRODUCE ERROR
