@@ -43,6 +43,8 @@ class Portfolio:
     def get_positions_df(self) -> pd.DataFrame:
         positions_df = pd.DataFrame([
             position.to_dict() for position in self.__positions])
+        if len(positions_df) == 0:
+            return positions_df
         positions_df.loc[:, 'at'] = pd.to_datetime(
             positions_df['at'], unit='s', utc=True)
         return positions_df.set_index('symbol')

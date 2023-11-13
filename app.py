@@ -94,7 +94,8 @@ class App():
     def calculate_rebalance_orders(self, next_positions: pd.Series) -> pd.Series:
         current_portfolio = self.get_current_portfolio()
         positions_df = current_portfolio.get_positions_df()
-        current_positions = positions_df['position']
+        current_positions = positions_df['position'] if len(
+            positions_df) > 0 else pd.Series([])
         rebalance_orders = next_positions.subtract(
             current_positions, fill_value=0)
         rebalance_orders = rebalance_orders.loc[next_positions.index]

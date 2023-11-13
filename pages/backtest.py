@@ -80,7 +80,8 @@ else:
     cash = current_portfolio.get_cash_balance()
     cash_for_next_positions = cash / 2  # TODO: integrate with Kelly formula later
     positions_df = current_portfolio.get_positions_df()
-    positions_df['at'] = positions_df['at'].dt.tz_convert(tz_local)
+    if len(positions_df) > 0:
+        positions_df['at'] = positions_df['at'].dt.tz_convert(tz_local)
     # Current positions
     with live_trading_container.container():
         live_trading_container.metric(
