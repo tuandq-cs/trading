@@ -36,6 +36,8 @@ class InteractiveBrokers:
         InstrumentConfig(symbol='XLE', type='ETF', conid='4215217'),
         InstrumentConfig(symbol='FENY', type='ETF', conid='137229016'),
         InstrumentConfig(symbol='XES', type='ETF', conid='413951493'),
+        InstrumentConfig(symbol='SRUUF', type='ETF', conid='504546655'),
+        InstrumentConfig(symbol='URA', type='ETF', conid='211651685'),
     ]
     __timeout_second: int = 60
     __supported_instrument_map: dict[str, Instrument] = {}
