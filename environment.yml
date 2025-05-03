@@ -1,0 +1,15 @@
+name: trading
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - numpy
+  - pandas
+  - streamlit
+  - matplotlib
+  - jupyterlab
+  - scikit-learn
+  - statsmodels
+  - plotly
+  - pykalman
